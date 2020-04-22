@@ -22,9 +22,11 @@ public class ObjUtils {
      * @param <R>
      * @return
      */
-    public static <T,R> List<R> copy(List<T> from, Class<? extends R> targetClazz){
+    public static <T,R> List<R> copyList(List<T> from, Class<? extends R> targetClazz){
         return (List<R>) copyCollection(from, targetClazz);
     }
+
+
 
     /**
      * 集合元素属性拷贝
@@ -82,7 +84,7 @@ public class ObjUtils {
      * @throws IllegalArgumentException
      * @return 返回null的情况：fromObj 为空 或者 targetClazz 不存在无参构造方法
      */
-    public static <T,R> R copyObj(T fromObj, Class<? extends R> targetClazz){
+    public static <T,R> R copy(T fromObj, Class<? extends R> targetClazz){
 
         if (fromObj == null){
             return null;
@@ -113,7 +115,18 @@ public class ObjUtils {
                         Collection targetVal = copyCollection(list, targetField.getClass());
                         targetField.set(b,targetVal);
                     } else {
-                        targetField.set(b, fromField.get(fromObj));
+                        Object obj = fromField.get(fromObj);
+                        if (obj == null){
+                            continue;
+                        }
+                        if (!targetClazz.equals(fromField.getAnnotatedType())){
+                            if (DateUtils.isDateType(obj)){
+                                Date date = DateUtils.toDate(obj);
+                                targetField.set(b, date);
+                                continue;
+                            }
+                        }
+                        targetField.set(b, obj);
                     }
                 }
             }
@@ -162,4 +175,5 @@ public class ObjUtils {
         });
         return notFinals;
     }
+
 }
