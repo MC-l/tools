@@ -1,4 +1,4 @@
-package com.mcl.tools.bailing;
+package com.mcl.tools;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -171,8 +171,8 @@ public class ObjUtils {
                             continue;
                         }
                         if (!targetClazz.equals(fromField.getAnnotatedType())){
-                            if (DateUtils.isDateType(obj)){
-                                Date date = DateUtils.toDate(obj);
+                            if (DateUtil.isDateType(obj)){
+                                Date date = DateUtil.toDate(obj);
                                 targetField.set(b, date);
                                 continue;
                             }

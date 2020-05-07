@@ -1,5 +1,4 @@
-package com.mcl.tools.bailing;
-
+package com.mcl.tools;
 import com.google.gson.*;
 
 import java.util.ArrayList;
@@ -21,7 +20,7 @@ public class JsonUtils {
     public static <T> List<T> parseList(String jsonStr, Class<T> cls) {
         Gson gson = new Gson();
         List<T> list = new ArrayList<T>();
-        JsonArray array = JsonParser.parseString(jsonStr).getAsJsonArray();
+        JsonArray array = new JsonParser().parse(jsonStr).getAsJsonArray();
         for (final JsonElement elem : array) {
             list.add(gson.fromJson(elem, cls));
         }
