@@ -1,7 +1,7 @@
 package com.mcl.tools;
 
-import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.springframework.util.StringUtils;
+import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
@@ -157,40 +157,5 @@ public final class FileUtil {
         return fileText;
     }
 
-    public static void writeLinesAsFile(String serviceFileText, String filePath) {
-        BufferedWriter bw = null;
-        try{
-            File file = new File(filePath);
 
-            if (file.exists()) {
-                FileUtils.forceDelete(file);
-            }
-
-            if(!file.getParentFile().exists()){
-                try {
-                    file.getParentFile().mkdirs();
-                    file.createNewFile();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-
-
-
-            bw = new BufferedWriter(new FileWriter(file));
-            bw.write(serviceFileText);
-            bw.flush();
-        } catch (Exception e){
-            throw new RuntimeException(e);
-        } finally {
-            if (bw != null){
-                try {
-                    bw.close();
-                } catch (IOException e) {
-
-                }
-            }
-        }
-
-    }
 }
