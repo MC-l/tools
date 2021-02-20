@@ -36,7 +36,7 @@ public class ObjUtils {
      * @return
      */
     public static <T,R> List<R> copyList(List<T> from, Class<? extends R> targetClazz, Transfer transfer){
-        return (List<R>) copyCollection(from, targetClazz,transfer);
+        return (List<R>) copyCollection(from, targetClazz,transfer,null);
     }
 
 
@@ -50,7 +50,7 @@ public class ObjUtils {
      * @return
      */
     public static <T,R> Collection<R> copyCollection(Collection<T> from, Class<? extends R> targetClazz){
-        return copyCollection(from,targetClazz,null);
+        return copyCollection(from,targetClazz,null,null);
     }
 
     /**
@@ -62,7 +62,7 @@ public class ObjUtils {
      * @param <R>
      * @return
      */
-    public static <T,R> Collection<R> copyCollection(Collection<T> from, Class<? extends R> targetClazz, Transfer transfer){
+    public static <T,R> Collection<R> copyCollection(Collection<T> from, Class<? extends R> targetClazz, Transfer transfer, Exclude exclude){
         if (from == null || from.size() == 0){
             return Collections.EMPTY_LIST;
         }
@@ -70,7 +70,7 @@ public class ObjUtils {
         Class<?> elementClass = from.iterator().next().getClass();
         List<Field> fromFields = getNotFinalsAndSetAccessible(elementClass);
 
-        Map<String,Field> fieldNameMap = toMap(fromFields.toArray(new Field[fromFields.size()]),transfer);
+        Map<String,Field> fieldNameMap = toMap(fromFields.toArray(new Field[fromFields.size()]),transfer, exclude);
 
         if (notFinals.isEmpty() || fieldNameMap.isEmpty()){
             return Collections.EMPTY_LIST;
@@ -113,7 +113,7 @@ public class ObjUtils {
      * @return 返回null的情况：fromObj 为空 或者 targetClazz 不存在无参构造方法
      */
     public static <T,R> R copy(T fromObj, Class<? extends R> targetClazz){
-        return copy(fromObj,targetClazz,null);
+        return copy(fromObj,targetClazz,null,null);
     }
 
     /**
@@ -130,7 +130,7 @@ public class ObjUtils {
      * @throws IllegalArgumentException
      * @return 返回null的情况：fromObj 为空 或者 targetClazz 不存在无参构造方法
      */
-    public static <T,R> R copy(T fromObj, Class<? extends R> targetClazz, Transfer transfer){
+    public static <T,R> R copy(T fromObj, Class<? extends R> targetClazz, Transfer transfer, Exclude exclude){
         if (fromObj == null){
             return null;
         }
@@ -138,7 +138,7 @@ public class ObjUtils {
         List<Field> notFinalsOnTarget = getNotFinalsAndSetAccessible(targetClazz);
         Class<?> fromClazz = fromObj.getClass();
         List<Field> fromFields = getNotFinalsAndSetAccessible(fromClazz);
-        Map<String,Field> fromFieldNameMap = toMap(fromFields.toArray(new Field[fromFields.size()]),transfer);
+        Map<String,Field> fromFieldNameMap = toMap(fromFields.toArray(new Field[fromFields.size()]),transfer, exclude);
 
         if (notFinalsOnTarget.isEmpty() || fromFieldNameMap.isEmpty()){
             try {
@@ -166,13 +166,15 @@ public class ObjUtils {
 
                         targetField.set(b,targetVal);
                     } else {
-                        Object obj = fromField.get(fromObj);
+                        Field field = getFieldIncludeAncestors(fromObj.getClass(),fromField.getName());
+                        field.setAccessible(true);
+                        Object obj = field.get(fromObj);
                         if (obj == null){
                             continue;
                         }
                         if (!targetClazz.equals(fromField.getAnnotatedType())){
-                            if (DateUtil.isDateType(obj)){
-                                Date date = DateUtil.toDate(obj);
+                            if (DateUtils.isDateType(obj)){
+                                Date date = DateUtils.toDate(obj);
                                 targetField.set(b, date);
                                 continue;
                             }
@@ -186,6 +188,22 @@ public class ObjUtils {
             e.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * 递归类的集成关系,寻找目标Field
+     * @param grandsonClass
+     * @param fieldName
+     * @return
+     */
+    public static Field getFieldIncludeAncestors(Class<?> grandsonClass, String fieldName){
+        Field field;
+        try{
+            field = grandsonClass.getDeclaredField(fieldName);
+        } catch(NoSuchFieldException e){
+            return getFieldIncludeAncestors(grandsonClass.getSuperclass(),fieldName);
+        }
+        return field;
     }
 
     /**
@@ -220,7 +238,7 @@ public class ObjUtils {
      * @param fields
      * @return
      */
-    private static Map<String,Field> toMap(Field[] fields, Transfer transfer){
+    private static Map<String,Field> toMap(Field[] fields, Transfer transfer, Exclude exclude){
         if (fields == null || fields.length == 0){
             return Collections.EMPTY_MAP;
         }
@@ -230,10 +248,17 @@ public class ObjUtils {
             if (!f.isAccessible()) {
                 f.setAccessible(true);
             }
+            // 转换
             if (transfer != null){
                 String to = transfer.getTo(f.getName());
                 if (to != null){
                     map.put(to, f);
+                    continue;
+                }
+            }
+            // 排除
+            if (exclude != null){
+                if (exclude.isExclude(f.getName())) {
                     continue;
                 }
             }
@@ -272,9 +297,17 @@ public class ObjUtils {
     /**
      * 属性名称转换映射
      */
-    public static class Transfer{
+    public static final class Transfer{
         private List<String> froms;
         private List<String> tos;
+
+        public void setFroms(List<String> froms) {
+            this.froms = froms;
+        }
+
+        public void setTos(List<String> tos) {
+            this.tos = tos;
+        }
 
         public static final Transfer INSTANCE = new Transfer();
 
@@ -298,23 +331,26 @@ public class ObjUtils {
             }
             return null;
         }
-
-        public void setFroms(List<String> froms) {
-            this.froms = froms;
-        }
-
-        public void setTos(List<String> tos) {
-            this.tos = tos;
-        }
     }
 
     /**
-     * 是否是true
-     * @param flag
-     * @return
+     * 排除的属性名
      */
-    public static boolean isFalse(Boolean flag){
-        return flag == null || !flag;
+    public static final class Exclude{
+
+        private Set<String> fieldNames;
+
+        public static final Exclude exclude(String ...fieldNames){
+            Exclude exclude = new Exclude();
+            if (fieldNames != null && fieldNames.length > 0){
+                exclude.fieldNames = Arrays.stream(fieldNames).collect(Collectors.toSet());
+            }
+            return exclude;
+        }
+
+        protected final boolean isExclude(String fieldName){
+            return fieldNames != null && !fieldNames.isEmpty() ? fieldNames.contains(fieldName) : false;
+        }
     }
 
 }
